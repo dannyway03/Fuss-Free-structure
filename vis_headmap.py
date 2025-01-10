@@ -11,15 +11,15 @@ import cv2
 import os
 import torch.nn.functional as F
 
-save_path = '/home/deeplearn/JupyterlabRoot/erdongsanshi/FFNet/'
+save_path = './vis/part_A_final'
 
-img_dir = "/datasets/shanghaitech/part_A_final/test_data/images"
+img_dir = "/home/nicola/Software/CrowdCounting-P2PNet/shanghaitech/part_A_final/test_data/images"
 
 images=os.listdir(img_dir)
 print(len(images))
-model_path = '/home/deeplearn/JupyterlabRoot/erdongsanshi/FFNet/SHA_model.pth'
+model_path = './weights/SHA_model.pth'
 model = FFNet()
-model.load_state_dict(torch.load(model_path))
+model.load_state_dict(torch.load(model_path, "cpu"))
 model = model.eval()
 
 input_H, input_W = 256,256

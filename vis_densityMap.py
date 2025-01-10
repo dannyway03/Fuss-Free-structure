@@ -11,9 +11,23 @@ import argparse
 import torch.nn.functional as F
 import cv2
 
+def letterbox_image(img, factor = 32):
+    '''resize image with unchanged aspect ratio using padding'''
+    img_w, img_h = img.size
+    size = max((img_w|(factor-1))+1, (img_h|(factor-1))+1)
+
+    w = size
+    h = size
+    new_w = int(img_w * min(w/img_w, h/img_h))
+    new_h = int(img_h * min(w/img_w, h/img_h))
+    new_image = Image.new('RGB', [size, size], (0,0,0))
+    img = img.resize((new_w,new_h), Image.BICUBIC)
+    new_image.paste(img, ((w - new_w) // 2, (h - new_h) // 2))
+    return new_image
+
 def vis(args):
     os.environ['CUDA_VISIBLE_DEVICES'] = args.device  # set vis gpu
-    device = torch.device('cuda')
+    device = torch.device('cpu')
 
     model_path = args.weight_path
     crop_size = args.crop_size
@@ -45,10 +59,15 @@ def vis(args):
         points = mat["annPoints"]
     else:
         mat = io.loadmat(image_path.replace('.jpg', '.mat').replace('images', 'ground_truth').replace("IMG", "GT_IMG"))
-        points = mat["annPoints"]
+        #points = mat["annPoints"]
+        points = mat['image_info'][0][0][0][0][0]
 
     gt_count = len(points)
     image = Image.open(image_path).convert("RGB")
+
+    # letterbox
+    image = letterbox_image(image, 32)
+
     wd, ht = image.size
     st_size = 1.0 * min(wd, ht)
     if st_size < crop_size:
@@ -69,15 +88,15 @@ def vis(args):
             transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
         ])
     image = transform(image)
-    gt_dmap_path = image_path.replace('.jpg', '.npy').replace('images', 'density_maps')
-    gt_dmap = np.load(gt_dmap_path)
+    # gt_dmap_path = image_path.replace('.jpg', '.npy').replace('images', 'density_maps')
+    # gt_dmap = np.load(gt_dmap_path)
 
     with torch.no_grad():
         # nputs = cal_new_tensor(inputs, min_size=args.crop_size)
         inputs = image.unsqueeze(0).to(device)
         crop_imgs, crop_masks = [], []
         b, c, h, w = inputs.size()
-        rh, rw = args.crop_size, args.crop_size
+        rh, rw = h, w # args.crop_size, args.crop_size
         for i in range(0, h, rh):
             gis, gie = max(min(h - rh, i), 0), min(h, i + rh)
             for j in range(0, w, rw):
@@ -113,29 +132,35 @@ def vis(args):
         mask = crop_masks.sum(dim=0).unsqueeze(0)
         pred_map = pred_map / mask
         pred_map = pred_map.squeeze(0).squeeze(0).cpu().data.numpy()
-    return pred_map, gt_dmap, gt_count
+    # return pred_map, gt_dmap, gt_count
+    return pred_map, _, gt_count
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--device', default='0', help='assign device')
-    parser.add_argument("--image_path", default='/datasets/crowd/test_pic/images/3110.jpg',type=str, required=False,
+    parser.add_argument('--device', default='-1', help='assign device')
+    parser.add_argument("--image_path", default='/home/nicola/Software/CrowdCounting-P2PNet/shanghaitech/part_A_final/test_data/images/IMG_2.jpg',type=str, required=False,
                         help="the image path to be detected.")
-    parser.add_argument("--weight_path", default='/home/deeplearn/JupyterlabRoot/erdongsanshi/FFNet/NWPU_model.pth',type=str, required=False,
+    parser.add_argument("--weight_path", default='./weights/SHA_model.pth',type=str, required=False,
                         help="the weight path to be loaded")
-    parser.add_argument('--crop_size', type=int, default=384,
+    parser.add_argument('--crop_size', type=int, default=256,
                         help='the crop size of the train image')
     parser.add_argument('--batch-size', type=int, default=1, help='train batch size')
 
     args = parser.parse_args()
     print(args)
 
-    pred_map, gt_dmap, gt_count = vis(args)
+    # pred_map, gt_dmap, gt_count = vis(args)
+
+    pred_map, _, gt_count = vis(args)
 
     save_path = "vis/%s"%(args.image_path.split("/")[-4]+"/"+args.image_path.split("/")[-1][:-4])
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
-    print("predmap count is %.2f, gt_dmap count is %.2f, gt count is %d"%(pred_map.sum(),gt_dmap.sum(),gt_count))
+    # print("predmap count is %.2f, gt_dmap count is %.2f, gt count is %d"%(pred_map.sum(),gt_dmap.sum(),gt_count))
+    print("predmap count is %.2f, gt count is %d"%(pred_map.sum(),gt_count))
+
+
     vis_img = pred_map
     # normalize density map values from 0 to 1, then map it to 0-255.
     vis_img = (vis_img - vis_img.min()) / (vis_img.max() - vis_img.min() + 1e-5)
@@ -143,6 +168,6 @@ if __name__ == "__main__":
     vis_img = cv2.applyColorMap(vis_img, cv2.COLORMAP_JET)
     cv2.imwrite("%s/pred_map.png" % save_path, vis_img)
 
-    plt.imsave("%s/gt_dmap.png" % save_path, gt_dmap, cmap = 'jet')
+    # plt.imsave("%s/gt_dmap.png" % save_path, gt_dmap, cmap = 'jet')
 
     print("the visual result saved in %s"%save_path)

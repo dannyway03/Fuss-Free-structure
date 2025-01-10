@@ -23,16 +23,16 @@ def cal_new_tensor(img_tensor, min_size=256):
     return img_tensor
 
 parser = argparse.ArgumentParser(description='Test ')
-parser.add_argument('--device', default='0', help='assign device')
+parser.add_argument('--device', default='-1', help='assign device')
 parser.add_argument('--batch-size', type=int, default=8,
                         help='train batch size')
 parser.add_argument('--crop-size', type=int, default=384,
                     help='the crop size of the train image')
-parser.add_argument('--model_path', type=str, default = '/home/deeplearn/JupyterlabRoot/erdongsanshi/FFNet/SHA_model.pth',
+parser.add_argument('--model_path', type=str, default = './weights/SHA_model.pth',
                     help='saved model path')
 
 # /datasets//NWPU-Train-Val-Test
-parser.add_argument('--data-path', type=str, default='/datasets/shanghaitech/part_A_final', 
+parser.add_argument('--data-path', type=str, default='/home/nicola/Software/CrowdCounting-P2PNet/shanghaitech/part_A_final',
                     help='dataset path')
 parser.add_argument('--dataset', type=str, default='sha',
                     help='dataset name: qnrf, nwpu, sha, shb, custom')
@@ -41,7 +41,7 @@ parser.add_argument('--pred-density-map-path', type=str, default='inference_resu
 
 def test(args, isSave = True):
     os.environ['CUDA_VISIBLE_DEVICES'] = args.device  # set vis gpu
-    device = torch.device('cuda')
+    device = torch.device('cpu')
 
     model_path = args.model_path
     crop_size = args.crop_size
